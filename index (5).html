@@ -1,0 +1,1807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FrameFlow – Video Production Manager</title>
+  <meta name="description" content="Project management for videography businesses" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { font-family: 'DM Sans', system-ui, sans-serif; background: #F7F7F8; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="root"></div>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel" data-type="module">
+const { useState, useEffect, useMemo } = React;
+
+// ─── Brand + Palette ────────────────────────────────────────────────────────
+const BRAND = "#E31B25";
+const BRAND_DARK = "#B51520";
+const BRAND_LIGHT = "#FCE8E9";
+
+// ─── Sample Data ─────────────────────────────────────────────────────────────
+const TEAM_MEMBERS = [
+  { id: "t1", name: "Alex Reid", role: "Director/Editor", avatar: "AR" },
+  { id: "t2", name: "Jordan Lee", role: "Camera Op", avatar: "JL" },
+  { id: "t3", name: "Sam Patel", name: "Sam Patel", role: "Sound", avatar: "SP" },
+  { id: "t4", name: "Chris Dunn", role: "Colourist", avatar: "CD" },
+];
+
+const STAGE_LABELS = ["Pre-production", "Shoot Day", "Post-production", "Client Review", "Final Delivery"];
+const STAGE_KEYS = ["pre_production", "shoot_day", "post_production", "client_review", "final_delivery"];
+
+// No fixed templates — all subtasks are user-defined per project
+
+const PROJECT_STATUSES = ["Enquiry","Booked","Pre-production","Filming","Editing","Client Review","Revisions","Delivered","Archived"];
+const TASK_STATUSES = ["Not Started","In Progress","Waiting on Client","Completed","Overdue"];
+const PRIORITIES = ["Low","Medium","High","Urgent"];
+const JOB_TYPES = ["Wedding","Corporate","Event","Social Content","Music Video","Documentary","Commercial"];
+
+function makeId() { return Math.random().toString(36).slice(2, 9); }
+
+function makeTasks() {
+  const tasks = {};
+  STAGE_KEYS.forEach(key => { tasks[key] = []; });
+  return tasks;
+}
+
+function makeTask(title = "") {
+  return {
+    id: makeId(), title, description: "",
+    dueDate: "", status: "Not Started", priority: "Medium",
+    assignedTo: "", comments: "", completed: false,
+  };
+}
+
+const INITIAL_PROJECTS = [
+  {
+    id: "p1",
+    name: "Harrison Wedding Film",
+    client: "Sophie & Tom Harrison",
+    clientEmail: "sophie.harrison@email.com",
+    clientPhone: "07712 345678",
+    jobType: "Wedding",
+    shootDate: "2025-06-14",
+    location: "Cliveden House, Berkshire",
+    deliveryDeadline: "2025-07-14",
+    status: "Editing",
+    priority: "High",
+    progress: 62,
+    notes: "Bride wants a 4-min highlight reel + full ceremony edit. Golden hour portraits a must. Church ceremony 2pm, reception 7pm.",
+    links: [
+      { label: "Google Drive – Raw Footage", url: "https://drive.google.com" },
+      { label: "Frame.io – Rough Cut", url: "https://frame.io" },
+    ],
+    tasks: null,
+    revisionCount: 1,
+    revisionLimit: 2,
+    team: ["t1", "t2"],
+    equipment: ["Sony FX3 x2", "DJI RS3 Gimbal", "Rode Wireless GO II", "Aputure 300D"],
+    deliverables: ["4-min Highlight Reel", "Full Ceremony Edit", "Speeches Edit", "Teaser Reel (Instagram)"],
+    activityLog: [
+      { date: "2025-05-20", note: "Rough cut uploaded to Frame.io" },
+      { date: "2025-05-10", note: "Footage imported and organised" },
+      { date: "2025-04-30", note: "Shoot day completed" },
+    ],
+  },
+  {
+    id: "p2",
+    name: "TechVision Brand Film",
+    client: "TechVision Ltd",
+    clientEmail: "marketing@techvision.co.uk",
+    clientPhone: "020 7890 1234",
+    jobType: "Corporate",
+    shootDate: "2025-06-03",
+    location: "TechVision HQ, London",
+    deliveryDeadline: "2025-06-24",
+    status: "Client Review",
+    priority: "Urgent",
+    progress: 80,
+    notes: "2-min brand film for website homepage. Also 30s cut for LinkedIn ads. CEO interview + B-roll of office culture.",
+    links: [
+      { label: "Frame.io – Preview v2", url: "https://frame.io" },
+      { label: "Dropbox – Assets", url: "https://dropbox.com" },
+    ],
+    tasks: null,
+    revisionCount: 2,
+    revisionLimit: 2,
+    team: ["t1", "t4"],
+    equipment: ["Sony FX6", "Sony 85mm GM", "Aputure 300D x2", "Rode NTG5"],
+    deliverables: ["2-min Brand Film (Web)", "30s Ad Cut (LinkedIn)", "15s Teaser"],
+    activityLog: [
+      { date: "2025-05-22", note: "Client reviewed v2, minor text change requested" },
+      { date: "2025-05-18", note: "v2 uploaded with colour grade applied" },
+      { date: "2025-05-12", note: "First edit shared. 1 revision round complete." },
+    ],
+  },
+  {
+    id: "p3",
+    name: "Pulse Festival Recap",
+    client: "Pulse Events",
+    clientEmail: "info@pulseevents.co.uk",
+    clientPhone: "0161 456 7890",
+    jobType: "Event",
+    shootDate: "2025-07-05",
+    location: "Victoria Warehouse, Manchester",
+    deliveryDeadline: "2025-07-12",
+    status: "Pre-production",
+    priority: "Medium",
+    progress: 20,
+    notes: "Music festival recap film. Multiple stages. Need energetic fast-cut edit. Deliver within 7 days of shoot.",
+    links: [],
+    tasks: null,
+    revisionCount: 0,
+    revisionLimit: 2,
+    team: ["t1", "t2", "t3"],
+    equipment: [],
+    deliverables: ["90s Recap Film", "20x Instagram Reels Clips"],
+    activityLog: [
+      { date: "2025-05-15", note: "Brief confirmed. Shot list in progress." },
+    ],
+  },
+  {
+    id: "p4",
+    name: "Glam Social Content Pack",
+    client: "Glam Beauty Co.",
+    clientEmail: "social@glambeauty.com",
+    clientPhone: "07834 567890",
+    jobType: "Social Content",
+    shootDate: "2025-05-28",
+    location: "Glam Studio, Birmingham",
+    deliveryDeadline: "2025-06-04",
+    status: "Filming",
+    priority: "High",
+    progress: 35,
+    notes: "12 product videos for Instagram & TikTok. Vertical format. 15–30s each. Clean white studio look.",
+    links: [
+      { label: "Google Drive – Brief & Brand Kit", url: "https://drive.google.com" },
+    ],
+    tasks: null,
+    revisionCount: 0,
+    revisionLimit: 3,
+    team: ["t1", "t2"],
+    equipment: ["Sony FX3", "Sony 50mm GM", "Godox SL200W x3"],
+    deliverables: ["12x Product Videos (vertical, 15–30s)"],
+    activityLog: [
+      { date: "2025-05-26", note: "Shoot day commenced. 6 of 12 products filmed." },
+    ],
+  },
+  {
+    id: "p5",
+    name: "Midnight Sun Music Video",
+    client: "Echo Records / Maya Voss",
+    clientEmail: "mgmt@mayavoss.com",
+    clientPhone: "07901 234567",
+    jobType: "Music Video",
+    shootDate: "2025-06-20",
+    location: "Various – London rooftops & underground",
+    deliveryDeadline: "2025-07-31",
+    status: "Booked",
+    priority: "Medium",
+    progress: 10,
+    notes: "Single release for 'Midnight Sun'. Artist confirmed dates. Need 3 location permits. Creative treatment approved.",
+    links: [
+      { label: "Google Drive – Treatment Doc", url: "https://drive.google.com" },
+    ],
+    tasks: null,
+    revisionCount: 0,
+    revisionLimit: 2,
+    team: ["t1", "t2", "t4"],
+    equipment: [],
+    deliverables: ["Official Music Video (4K, 3:30)", "YouTube Version", "Behind-the-Scenes Cut"],
+    activityLog: [
+      { date: "2025-05-20", note: "Creative treatment approved by label." },
+      { date: "2025-05-10", note: "Deposit invoice paid." },
+    ],
+  },
+];
+
+// Seed sample tasks for demo projects
+const SAMPLE_TASKS = {
+  p1: {
+    pre_production: [
+      { ...makeTask("Confirm brief"), status: "Completed", completed: true, priority: "High" },
+      { ...makeTask("Create shot list"), status: "Completed", completed: true },
+      { ...makeTask("Schedule shoot day"), status: "Completed", completed: true },
+    ],
+    shoot_day: [
+      { ...makeTask("Travel to location"), status: "Completed", completed: true },
+      { ...makeTask("Film ceremony"), status: "Completed", completed: true },
+      { ...makeTask("Back up footage on-site"), status: "Completed", completed: true },
+    ],
+    post_production: [
+      { ...makeTask("Import footage"), status: "Completed", completed: true },
+      { ...makeTask("First edit"), status: "In Progress", priority: "High" },
+      { ...makeTask("Colour grade"), status: "Not Started" },
+      { ...makeTask("Sound mix"), status: "Not Started" },
+    ],
+    client_review: [
+      { ...makeTask("Upload client preview"), status: "Not Started" },
+      { ...makeTask("Receive feedback"), status: "Not Started" },
+    ],
+    final_delivery: [
+      { ...makeTask("Export final files"), status: "Not Started" },
+      { ...makeTask("Deliver to client"), status: "Not Started" },
+    ],
+  },
+  p2: {
+    pre_production: [
+      { ...makeTask("Confirm brief"), status: "Completed", completed: true },
+      { ...makeTask("Recce location"), status: "Completed", completed: true },
+      { ...makeTask("Create shot list"), status: "Completed", completed: true },
+    ],
+    shoot_day: [
+      { ...makeTask("CEO interview setup"), status: "Completed", completed: true },
+      { ...makeTask("B-roll office culture"), status: "Completed", completed: true },
+    ],
+    post_production: [
+      { ...makeTask("Assembly edit"), status: "Completed", completed: true },
+      { ...makeTask("Colour grade"), status: "Completed", completed: true },
+      { ...makeTask("Sound mix"), status: "Completed", completed: true },
+      { ...makeTask("Apply revision notes"), status: "Completed", completed: true },
+    ],
+    client_review: [
+      { ...makeTask("Upload preview v2"), status: "Completed", completed: true },
+      { ...makeTask("Await final sign-off"), status: "Waiting on Client", priority: "Urgent" },
+    ],
+    final_delivery: [
+      { ...makeTask("Export all formats"), status: "Not Started" },
+      { ...makeTask("Deliver final files"), status: "Not Started" },
+    ],
+  },
+};
+
+INITIAL_PROJECTS.forEach(p => {
+  p.tasks = SAMPLE_TASKS[p.id]
+    ? Object.fromEntries(STAGE_KEYS.map(k => [k, (SAMPLE_TASKS[p.id][k] || []).map(t => ({ ...makeTask(), ...t, id: makeId() }))]))
+    : makeTasks();
+});
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const statusColors = {
+  Enquiry: "#8B5CF6", Booked: "#3B82F6", "Pre-production": "#F59E0B",
+  Filming: "#EF4444", Editing: "#6366F1", "Client Review": "#EC4899",
+  Revisions: "#F97316", Delivered: "#10B981", Archived: "#6B7280",
+};
+const taskStatusColors = {
+  "Not Started": "#9CA3AF", "In Progress": "#3B82F6",
+  "Waiting on Client": "#F59E0B", Completed: "#10B981", Overdue: "#EF4444",
+};
+const priorityColors = { Low: "#10B981", Medium: "#3B82F6", High: "#F59E0B", Urgent: "#EF4444" };
+
+
+function calcProgress(tasks) {
+  const all = STAGE_KEYS.flatMap(k => tasks[k] || []);
+  if (!all.length) return 0;
+  return Math.round((all.filter(t => t.completed).length / all.length) * 100);
+}
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const diff = new Date(dateStr) - new Date();
+  return Math.ceil(diff / 86400000);
+}
+
+function fmt(dateStr) {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// ─── Styled Primitives ────────────────────────────────────────────────────────
+const styles = {
+  badge: (color, bg) => ({
+    display: "inline-flex", alignItems: "center", padding: "2px 8px",
+    borderRadius: 20, fontSize: 11, fontWeight: 600, letterSpacing: 0.3,
+    color, background: bg || color + "22",
+  }),
+  card: {
+    background: "#fff", border: "1px solid #F1F1F1", borderRadius: 12,
+    padding: "1.25rem", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+  },
+  btn: (variant = "primary") => ({
+    display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px",
+    borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+    background: variant === "primary" ? BRAND : variant === "ghost" ? "transparent" : "#F3F4F6",
+    color: variant === "primary" ? "#fff" : variant === "ghost" ? "#6B7280" : "#374151",
+    transition: "all 0.15s",
+  }),
+  input: {
+    width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #E5E7EB",
+    fontSize: 13, color: "#111", background: "#FAFAFA", outline: "none", boxSizing: "border-box",
+  },
+};
+
+// ─── Small Components ─────────────────────────────────────────────────────────
+function StatusBadge({ status }) {
+  const c = statusColors[status] || "#6B7280";
+  return <span style={styles.badge(c)}>{status}</span>;
+}
+function TaskBadge({ status }) {
+  const c = taskStatusColors[status] || "#9CA3AF";
+  return <span style={styles.badge(c)}>{status}</span>;
+}
+function PriBadge({ p }) {
+  const c = priorityColors[p] || "#6B7280";
+  return <span style={styles.badge(c)}>{p}</span>;
+}
+function Avatar({ initials, size = 32 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", background: BRAND_LIGHT,
+      color: BRAND, fontSize: size * 0.35, fontWeight: 700,
+      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+    }}>{initials}</div>
+  );
+}
+function ProgressBar({ pct, height = 8, color = BRAND }) {
+  return (
+    <div style={{ height, borderRadius: height, background: "#F3F4F6", overflow: "hidden" }}>
+      <div style={{
+        width: `${Math.min(pct, 100)}%`, height: "100%", borderRadius: height,
+        background: pct >= 100 ? "#10B981" : color, transition: "width 0.4s",
+      }} />
+    </div>
+  );
+}
+
+// ─── Nav ─────────────────────────────────────────────────────────────────────
+function Nav({ view, setView, projects }) {
+  const navItems = [
+    { id: "dashboard", label: "Dashboard", icon: "⊞" },
+    { id: "projects", label: "Projects", icon: "◈" },
+    { id: "calendar", label: "Calendar", icon: "◷" },
+    { id: "analytics", label: "Analytics", icon: "▣" },
+  ];
+  return (
+    <aside style={{
+      width: 220, minHeight: "100vh", background: "#111", display: "flex",
+      flexDirection: "column", padding: "0 0 2rem", flexShrink: 0,
+    }}>
+      <div style={{ padding: "1.5rem 1.25rem 1rem", borderBottom: "1px solid #222" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 8, background: BRAND,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 16, fontWeight: 900, color: "#fff",
+          }}>▶</div>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 800, fontSize: 15, letterSpacing: -0.3 }}>FrameFlow</div>
+            <div style={{ color: "#555", fontSize: 11 }}>Video Production</div>
+          </div>
+        </div>
+      </div>
+      <nav style={{ padding: "1rem 0.75rem", flex: 1 }}>
+        {navItems.map(item => (
+          <button key={item.id} onClick={() => setView(item.id)}
+            style={{
+              display: "flex", alignItems: "center", gap: 10, width: "100%",
+              padding: "9px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+              background: view === item.id ? BRAND : "transparent",
+              color: view === item.id ? "#fff" : "#888",
+              fontSize: 13, fontWeight: 500, marginBottom: 2, textAlign: "left",
+              transition: "all 0.15s",
+            }}>
+            <span style={{ fontSize: 16 }}>{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+      <div style={{ padding: "0 0.75rem" }}>
+        <div style={{ background: "#1A1A1A", borderRadius: 10, padding: "12px" }}>
+          <div style={{ color: "#666", fontSize: 11, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Active Projects</div>
+          {projects.filter(p => !["Delivered","Archived"].includes(p.status)).slice(0, 4).map(p => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: statusColors[p.status] || "#555", flexShrink: 0 }} />
+              <span style={{ color: "#AAA", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+function Dashboard({ projects, setView, setSelectedProject }) {
+  const active = projects.filter(p => !["Delivered","Archived"].includes(p.status));
+  const overdue = projects.filter(p => p.deliveryDeadline && daysUntil(p.deliveryDeadline) < 0 && p.status !== "Delivered");
+  const dueSoon = projects.filter(p => {
+    const d = daysUntil(p.deliveryDeadline);
+    return d !== null && d >= 0 && d <= 7;
+  });
+
+  const stats = [
+    { label: "Active Projects", value: active.length, color: BRAND },
+    { label: "Overdue", value: overdue.length, color: "#EF4444" },
+    { label: "Due This Week", value: dueSoon.length, color: "#F59E0B" },
+    { label: "Delivered", value: projects.filter(p => p.status === "Delivered").length, color: "#10B981" },
+  ];
+
+  return (
+    <div>
+      <div style={{ marginBottom: "1.5rem" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111", margin: 0 }}>Dashboard</h1>
+        <p style={{ color: "#6B7280", fontSize: 14, margin: "4px 0 0" }}>
+          {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        </p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+        {stats.map(s => (
+          <div key={s.label} style={{ ...styles.card, borderTop: `3px solid ${s.color}` }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {(overdue.length > 0 || dueSoon.length > 0) && (
+        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, color: "#B91C1C", fontSize: 13, marginBottom: 6 }}>⚠ Attention Required</div>
+          {overdue.map(p => (
+            <div key={p.id} style={{ fontSize: 13, color: "#991B1B", marginBottom: 2 }}>
+              <strong>{p.name}</strong> — deadline was {fmt(p.deliveryDeadline)} ({Math.abs(daysUntil(p.deliveryDeadline))} days overdue)
+            </div>
+          ))}
+          {dueSoon.map(p => (
+            <div key={p.id} style={{ fontSize: 13, color: "#92400E", marginBottom: 2 }}>
+              <strong>{p.name}</strong> — due in {daysUntil(p.deliveryDeadline)} days ({fmt(p.deliveryDeadline)})
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ ...styles.card, marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Active Projects</h2>
+          <button style={styles.btn("ghost")} onClick={() => setView("projects")}>View all →</button>
+        </div>
+        <ProjectTable projects={active.slice(0, 5)} onSelect={p => { setSelectedProject(p); setView("project_detail"); }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Project Table ────────────────────────────────────────────────────────────
+function ProjectTable({ projects, onSelect }) {
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <thead>
+        <tr style={{ background: "#F9FAFB" }}>
+          {["Project","Client","Type","Location","Shoot Date","Deadline","Status","Priority","Progress"].map(h => (
+            <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, color: "#6B7280", borderBottom: "1px solid #F1F1F1", whiteSpace: "nowrap" }}>{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {projects.map(p => {
+          const days = daysUntil(p.deliveryDeadline);
+          const isOverdue = days !== null && days < 0 && p.status !== "Delivered";
+          const isSoon = days !== null && days >= 0 && days <= 3;
+          return (
+            <tr key={p.id} onClick={() => onSelect(p)}
+              style={{ cursor: "pointer", borderBottom: "1px solid #F9FAFB", transition: "background 0.1s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#FAFAFA"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <td style={{ padding: "10px", fontWeight: 600, color: "#111", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</td>
+              <td style={{ padding: "10px", color: "#374151", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.client}</td>
+              <td style={{ padding: "10px" }}><span style={{ fontSize: 11, color: "#6B7280" }}>{p.jobType}</span></td>
+              <td style={{ padding: "10px", color: "#374151", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.location || "—"}</td>
+              <td style={{ padding: "10px", color: "#374151", whiteSpace: "nowrap" }}>{fmt(p.shootDate)}</td>
+              <td style={{ padding: "10px", whiteSpace: "nowrap" }}>
+                <span style={{ color: isOverdue ? "#EF4444" : isSoon ? "#F59E0B" : "#374151", fontWeight: isOverdue || isSoon ? 600 : 400 }}>
+                  {fmt(p.deliveryDeadline)}
+                  {isOverdue && " ⚠"}
+                  {isSoon && !isOverdue && " 🔔"}
+                </span>
+              </td>
+              <td style={{ padding: "10px" }}><StatusBadge status={p.status} /></td>
+              <td style={{ padding: "10px" }}><PriBadge p={p.priority} /></td>
+              <td style={{ padding: "10px", minWidth: 120 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1 }}><ProgressBar pct={calcProgress(p.tasks)} /></div>
+                  <span style={{ fontSize: 11, color: "#6B7280", whiteSpace: "nowrap" }}>{calcProgress(p.tasks)}%</span>
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+// ─── Projects List View ───────────────────────────────────────────────────────
+function ProjectsView({ projects, setProjects, setSelectedProject, setView }) {
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterPriority, setFilterPriority] = useState("All");
+  const [filterType, setFilterType] = useState("All");
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+
+  const filtered = useMemo(() => projects.filter(p => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || p.name.toLowerCase().includes(q) || p.client.toLowerCase().includes(q);
+    const matchStatus = filterStatus === "All" || p.status === filterStatus;
+    const matchPri = filterPriority === "All" || p.priority === filterPriority;
+    const matchType = filterType === "All" || p.jobType === filterType;
+    return matchSearch && matchStatus && matchPri && matchType;
+  }), [projects, search, filterStatus, filterPriority, filterType]);
+
+  const sel = s => ({ padding: "8px 12px", borderRadius: 8, border: "1px solid #E5E7EB", fontSize: 13, color: "#374151", background: "#FAFAFA", cursor: "pointer" });
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Projects</h1>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button style={styles.btn("secondary")} onClick={() => setShowTemplateModal(true)}>📋 Use Template</button>
+          <button style={styles.btn()} onClick={() => setShowNewModal(true)}>+ New Project</button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <input style={{ ...styles.input, maxWidth: 240 }} placeholder="🔍 Search projects..." value={search} onChange={e => setSearch(e.target.value)} />
+        <select style={sel()} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option>All</option>
+          {PROJECT_STATUSES.map(s => <option key={s}>{s}</option>)}
+        </select>
+        <select style={sel()} value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
+          <option>All</option>
+          {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+        </select>
+        <select style={sel()} value={filterType} onChange={e => setFilterType(e.target.value)}>
+          <option>All</option>
+          {JOB_TYPES.map(t => <option key={t}>{t}</option>)}
+        </select>
+      </div>
+
+      <div style={styles.card}>
+        <ProjectTable
+          projects={filtered}
+          onSelect={p => { setSelectedProject(p); setView("project_detail"); }}
+        />
+        {filtered.length === 0 && (
+          <div style={{ textAlign: "center", padding: "2rem", color: "#9CA3AF" }}>No projects match your filters.</div>
+        )}
+      </div>
+
+      {showNewModal && (
+        <NewProjectModal
+          onClose={() => setShowNewModal(false)}
+          onCreate={proj => {
+            proj.tasks = makeTasks();
+            setProjects(prev => [proj, ...prev]);
+            setShowNewModal(false);
+          }}
+        />
+      )}
+      {showTemplateModal && (
+        <TemplateModal
+          onClose={() => setShowTemplateModal(false)}
+          onCreate={proj => {
+            proj.tasks = makeTasks();
+            setProjects(prev => [proj, ...prev]);
+            setShowTemplateModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── New Project Modal ────────────────────────────────────────────────────────
+function NewProjectModal({ onClose, onCreate, prefill = {} }) {
+  const [form, setForm] = useState({
+    name: prefill.name || "", client: prefill.client || "", clientEmail: prefill.clientEmail || "",
+    clientPhone: prefill.clientPhone || "", jobType: prefill.jobType || "Corporate",
+    shootDate: "", location: "", deliveryDeadline: "", status: "Enquiry",
+    priority: "Medium",
+    notes: prefill.notes || "", links: [], revisionLimit: 2,
+    team: [], equipment: [], deliverables: [], activityLog: [], revisionCount: 0,
+  });
+  const F = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const row = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 };
+  const label = { fontSize: 12, color: "#6B7280", fontWeight: 600, marginBottom: 4, display: "block" };
+
+  return (
+    <Modal title="New Project" onClose={onClose} width={600}>
+      <div style={row}>
+        <div><label style={label}>Project Name *</label><input style={styles.input} value={form.name} onChange={e => F("name", e.target.value)} /></div>
+        <div><label style={label}>Job Type</label>
+          <select style={styles.input} value={form.jobType} onChange={e => F("jobType", e.target.value)}>
+            {JOB_TYPES.map(t => <option key={t}>{t}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={row}>
+        <div><label style={label}>Client Name *</label><input style={styles.input} value={form.client} onChange={e => F("client", e.target.value)} /></div>
+        <div><label style={label}>Client Email</label><input style={styles.input} value={form.clientEmail} onChange={e => F("clientEmail", e.target.value)} /></div>
+      </div>
+      <div style={row}>
+        <div><label style={label}>Client Phone</label><input style={styles.input} value={form.clientPhone} onChange={e => F("clientPhone", e.target.value)} /></div>
+        <div><label style={label}>Location</label><input style={styles.input} value={form.location} onChange={e => F("location", e.target.value)} /></div>
+      </div>
+      <div style={row}>
+        <div><label style={label}>Shoot Date</label><input type="date" style={styles.input} value={form.shootDate} onChange={e => F("shootDate", e.target.value)} /></div>
+        <div><label style={label}>Delivery Deadline</label><input type="date" style={styles.input} value={form.deliveryDeadline} onChange={e => F("deliveryDeadline", e.target.value)} /></div>
+      </div>
+      <div style={row}>
+        <div><label style={label}>Status</label>
+          <select style={styles.input} value={form.status} onChange={e => F("status", e.target.value)}>
+            {PROJECT_STATUSES.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+        <div><label style={label}>Priority</label>
+          <select style={styles.input} value={form.priority} onChange={e => F("priority", e.target.value)}>
+            {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <label style={label}>Notes</label>
+        <textarea style={{ ...styles.input, height: 80, resize: "vertical" }} value={form.notes} onChange={e => F("notes", e.target.value)} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+        <button style={styles.btn("secondary")} onClick={onClose}>Cancel</button>
+        <button style={styles.btn()} onClick={() => form.name && form.client && onCreate({ ...form, id: makeId(), progress: 0 })}>
+          Create Project
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Template Modal ───────────────────────────────────────────────────────────
+const TEMPLATES = {
+  Wedding: { name: "New Wedding Film", jobType: "Wedding", notes: "Highlight reel + ceremony edit. Deliver within 4 weeks of shoot.", revisionLimit: 2, deliverables: ["Highlight Reel", "Full Ceremony", "Speeches", "Teaser Reel"] },
+  Corporate: { name: "New Corporate Video", jobType: "Corporate", notes: "Brand or product film for web/socials.", revisionLimit: 3, deliverables: ["Main Film (2-3 min)", "Short Cut (30–60s)", "Social Edits"] },
+  Event: { name: "New Event Recap", jobType: "Event", notes: "Fast-turnaround event recap film.", revisionLimit: 1, deliverables: ["Recap Film", "Social Clips"] },
+  "Social Content": { name: "New Social Content Shoot", jobType: "Social Content", notes: "Vertical short-form content for Instagram/TikTok.", revisionLimit: 3, deliverables: ["Multiple Short Videos (15–60s)"] },
+  "Music Video": { name: "New Music Video", jobType: "Music Video", notes: "Official music video production.", revisionLimit: 2, deliverables: ["Official MV", "YouTube Version", "BTS Cut"] },
+};
+
+function TemplateModal({ onClose, onCreate }) {
+  const [selected, setSelected] = useState(null);
+  return (
+    <Modal title="Start from Template" onClose={onClose} width={500}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+        {Object.entries(TEMPLATES).map(([key, tmpl]) => (
+          <div key={key} onClick={() => setSelected(key)}
+            style={{
+              padding: "14px", borderRadius: 10, border: `2px solid ${selected === key ? BRAND : "#E5E7EB"}`,
+              cursor: "pointer", background: selected === key ? BRAND_LIGHT : "#fff", transition: "all 0.15s",
+            }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#111", marginBottom: 4 }}>{key}</div>
+            <div style={{ fontSize: 12, color: "#6B7280" }}>{tmpl.deliverables[0]}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <button style={styles.btn("secondary")} onClick={onClose}>Cancel</button>
+        <button style={styles.btn()} disabled={!selected}
+          onClick={() => selected && onCreate({ ...TEMPLATES[selected], id: makeId(), client: "", clientEmail: "", clientPhone: "", shootDate: "", location: "", deliveryDeadline: "", status: "Enquiry", priority: "Medium", links: [], team: [], equipment: [], activityLog: [], revisionCount: 0, progress: 0 })}>
+          Use Template →
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Modal Shell ──────────────────────────────────────────────────────────────
+function Modal({ title, onClose, children, width = 500 }) {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: width, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #F1F1F1" }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#6B7280" }}>×</button>
+        </div>
+        <div style={{ padding: "20px" }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Project Detail ───────────────────────────────────────────────────────────
+function ProjectDetail({ project, setProjects, onBack }) {
+  const [activeTab, setActiveTab] = useState("overview");
+  const [proj, setProj] = useState(project);
+
+  const save = (updated) => {
+    setProj(updated);
+    setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+  };
+
+  const tabs = ["overview","tasks","files","team","activity","deliverables"];
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <button style={{ ...styles.btn("ghost"), padding: "6px 10px" }} onClick={onBack}>← Back</button>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>{proj.name}</h1>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+            <StatusBadge status={proj.status} />
+            <PriBadge p={proj.priority} />
+            <span style={{ color: "#6B7280", fontSize: 13 }}>{proj.jobType}</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <select style={{ ...styles.input, width: "auto" }} value={proj.status}
+            onChange={e => save({ ...proj, status: e.target.value })}>
+            {PROJECT_STATUSES.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "2px solid #F1F1F1", paddingBottom: 0 }}>
+        {tabs.map(t => (
+          <button key={t} onClick={() => setActiveTab(t)}
+            style={{
+              padding: "8px 14px", border: "none", background: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600, color: activeTab === t ? BRAND : "#6B7280",
+              borderBottom: `2px solid ${activeTab === t ? BRAND : "transparent"}`,
+              marginBottom: -2, textTransform: "capitalize", transition: "all 0.15s",
+            }}>{t}</button>
+        ))}
+      </div>
+
+      {activeTab === "overview" && <ProjectOverview proj={proj} save={save} />}
+      {activeTab === "tasks" && <TasksView proj={proj} save={save} />}
+      {activeTab === "files" && <FilesView proj={proj} save={save} />}
+      {activeTab === "team" && <TeamView proj={proj} save={save} />}
+      {activeTab === "activity" && <ActivityView proj={proj} save={save} />}
+      {activeTab === "deliverables" && <DeliverablesView proj={proj} save={save} />}
+    </div>
+  );
+}
+
+// ─── Project Overview ─────────────────────────────────────────────────────────
+function ProjectOverview({ proj, save }) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(proj);
+  const progress = calcProgress(proj.tasks);
+  const F = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20 }}>
+      <div>
+        <div style={styles.card}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Project Details</h3>
+            {!editing
+              ? <button style={styles.btn("secondary")} onClick={() => setEditing(true)}>✏ Edit</button>
+              : <div style={{ display: "flex", gap: 8 }}>
+                  <button style={styles.btn("ghost")} onClick={() => setEditing(false)}>Cancel</button>
+                  <button style={styles.btn()} onClick={() => { save(form); setEditing(false); }}>Save</button>
+                </div>
+            }
+          </div>
+          {editing ? (
+            <div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {[["name","Project Name"],["client","Client Name"],["clientEmail","Email"],["clientPhone","Phone"],["location","Location"]].map(([k,l]) => (
+                  <div key={k}>
+                    <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>{l}</label>
+                    <input style={styles.input} value={form[k] || ""} onChange={e => F(k, e.target.value)} />
+                  </div>
+                ))}
+                <div>
+                  <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>Shoot Date</label>
+                  <input type="date" style={styles.input} value={form.shootDate} onChange={e => F("shootDate", e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>Delivery Deadline</label>
+                  <input type="date" style={styles.input} value={form.deliveryDeadline} onChange={e => F("deliveryDeadline", e.target.value)} />
+                </div>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>Notes</label>
+                <textarea style={{ ...styles.input, height: 80 }} value={form.notes} onChange={e => F("notes", e.target.value)} />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {[
+                  ["Client", proj.client], ["Email", proj.clientEmail], ["Phone", proj.clientPhone],
+                  ["Job Type", proj.jobType], ["Location", proj.location],
+                  ["Shoot Date", fmt(proj.shootDate)], ["Delivery", fmt(proj.deliveryDeadline)],
+                  ["Revisions", `${proj.revisionCount} / ${proj.revisionLimit} used`],
+                ].map(([k, v]) => v && (
+                  <div key={k}>
+                    <div style={{ fontSize: 11, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 0.5 }}>{k}</div>
+                    <div style={{ fontSize: 14, color: "#111", fontWeight: 500, marginTop: 2 }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              {proj.notes && (
+                <div style={{ marginTop: 16, background: "#F9FAFB", borderRadius: 8, padding: 12 }}>
+                  <div style={{ fontSize: 11, color: "#9CA3AF", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>Notes</div>
+                  <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{proj.notes}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ ...styles.card, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 8 }}>Overall Progress</div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: BRAND, marginBottom: 8 }}>{progress}%</div>
+          <ProgressBar pct={progress} height={10} />
+          <div style={{ marginTop: 12 }}>
+            {STAGE_KEYS.map((k, i) => {
+              const tasks = proj.tasks[k] || [];
+              const done = tasks.filter(t => t.completed).length;
+              const pct = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+              return (
+                <div key={k} style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6B7280", marginBottom: 3 }}>
+                    <span>{STAGE_LABELS[i]}</span>
+                    <span>{done}/{tasks.length}</span>
+                  </div>
+                  <ProgressBar pct={pct} height={5} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={styles.card}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Equipment Checklist</div>
+          <EquipmentChecklist proj={proj} save={save} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EquipmentChecklist({ proj, save }) {
+  const [newItem, setNewItem] = useState("");
+  const [checked, setChecked] = useState({});
+
+  return (
+    <div>
+      {(proj.equipment || []).map((item, i) => (
+        <label key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", cursor: "pointer" }}>
+          <input type="checkbox" checked={!!checked[i]} onChange={e => setChecked(c => ({ ...c, [i]: e.target.checked }))} />
+          <span style={{ fontSize: 13, color: checked[i] ? "#9CA3AF" : "#374151", textDecoration: checked[i] ? "line-through" : "none" }}>{item}</span>
+        </label>
+      ))}
+      <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+        <input style={{ ...styles.input, fontSize: 12 }} value={newItem} placeholder="Add item..." onChange={e => setNewItem(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && newItem.trim()) { save({ ...proj, equipment: [...(proj.equipment || []), newItem.trim()] }); setNewItem(""); } }} />
+        <button style={{ ...styles.btn(), padding: "6px 10px", fontSize: 12 }}
+          onClick={() => { if (newItem.trim()) { save({ ...proj, equipment: [...(proj.equipment || []), newItem.trim()] }); setNewItem(""); } }}>+</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tasks View ───────────────────────────────────────────────────────────────
+function TasksView({ proj, save }) {
+  const [expanded, setExpanded] = useState(
+    Object.fromEntries(STAGE_KEYS.map(k => [k, true]))
+  );
+  const [adding, setAdding] = useState(null); // stageKey being typed into
+  const [addTitle, setAddTitle] = useState("");
+  const [expandedTask, setExpandedTask] = useState(null); // taskId with details open
+
+  const toggleStage = k => setExpanded(e => ({ ...e, [k]: !e[k] }));
+
+  const updateTask = (stageKey, taskId, changes) =>
+    save({
+      ...proj,
+      tasks: {
+        ...proj.tasks,
+        [stageKey]: proj.tasks[stageKey].map(t =>
+          t.id === taskId ? { ...t, ...changes } : t
+        ),
+      },
+    });
+
+  const addTask = stageKey => {
+    if (!addTitle.trim()) return;
+    save({
+      ...proj,
+      tasks: {
+        ...proj.tasks,
+        [stageKey]: [...proj.tasks[stageKey], makeTask(addTitle.trim())],
+      },
+    });
+    setAddTitle("");
+    setAdding(null);
+  };
+
+  const removeTask = (stageKey, taskId) =>
+    save({
+      ...proj,
+      tasks: {
+        ...proj.tasks,
+        [stageKey]: proj.tasks[stageKey].filter(t => t.id !== taskId),
+      },
+    });
+
+  const totalAll = STAGE_KEYS.flatMap(k => proj.tasks[k]).length;
+  const doneAll  = STAGE_KEYS.flatMap(k => proj.tasks[k]).filter(t => t.completed).length;
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const clearCompleted = () => {
+    const cleaned = Object.fromEntries(
+      STAGE_KEYS.map(k => [k, proj.tasks[k].filter(t => !t.completed)])
+    );
+    save({ ...proj, tasks: cleaned });
+    setConfirmClear(false);
+  };
+
+  return (
+    <div>
+      {/* Overall mini-bar */}
+      <div style={{ ...styles.card, marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: doneAll > 0 ? 14 : 0 }}>
+          <div style={{ fontSize: 13, color: "#6B7280", whiteSpace: "nowrap" }}>Overall</div>
+          <div style={{ flex: 1 }}><ProgressBar pct={totalAll ? (doneAll / totalAll) * 100 : 0} height={8} /></div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: BRAND, whiteSpace: "nowrap" }}>{doneAll}/{totalAll} done</div>
+        </div>
+
+        {doneAll > 0 && (
+          <div style={{
+            borderTop: "1px solid #F1F1F1", paddingTop: 12,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: "50%", background: "#DCFCE7",
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              }}>
+                <span style={{ fontSize: 12, color: "#16A34A" }}>✓</span>
+              </div>
+              <span style={{ fontSize: 13, color: "#374151" }}>
+                <strong style={{ color: "#16A34A" }}>{doneAll} completed {doneAll === 1 ? "task" : "tasks"}</strong>
+                {" "}across all stages
+              </span>
+            </div>
+            {!confirmClear ? (
+              <button
+                onClick={() => setConfirmClear(true)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 14px", borderRadius: 8, border: "1px solid #FECACA",
+                  background: "#FEF2F2", color: "#DC2626", fontSize: 12, fontWeight: 600,
+                  cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#FEE2E2"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "#FEF2F2"; }}
+              >
+                🗑 Delete completed tasks
+              </button>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, color: "#6B7280" }}>Remove {doneAll} tasks permanently?</span>
+                <button
+                  onClick={clearCompleted}
+                  style={{
+                    padding: "6px 14px", borderRadius: 8, border: "none",
+                    background: "#DC2626", color: "#fff", fontSize: 12, fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >Yes, delete</button>
+                <button
+                  onClick={() => setConfirmClear(false)}
+                  style={{
+                    padding: "6px 12px", borderRadius: 8, border: "1px solid #E5E7EB",
+                    background: "#fff", color: "#6B7280", fontSize: 12, fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >Cancel</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {STAGE_KEYS.map((key, si) => {
+        const stageTasks = proj.tasks[key] || [];
+        const done = stageTasks.filter(t => t.completed).length;
+        const pct  = stageTasks.length ? Math.round(done / stageTasks.length * 100) : 0;
+
+        return (
+          <div key={key} style={{ ...styles.card, marginBottom: 16 }}>
+
+            {/* Stage header */}
+            <div
+              onClick={() => toggleStage(key)}
+              style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
+                marginBottom: expanded[key] ? 14 : 0 }}
+            >
+              <span style={{ fontSize: 13, color: "#9CA3AF" }}>{expanded[key] ? "▾" : "▸"}</span>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, flex: 1, color: "#111" }}>
+                {STAGE_LABELS[si]}
+              </h3>
+              <span style={{ fontSize: 11, color: "#9CA3AF" }}>{done}/{stageTasks.length}</span>
+              <div style={{ width: 80 }}><ProgressBar pct={pct} height={5} /></div>
+            </div>
+
+            {expanded[key] && (
+              <div>
+                {/* Column headers (shown only if there are tasks) */}
+                {stageTasks.length > 0 && (
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "20px 1fr 110px 120px 90px 120px 60px 28px",
+                    gap: 8, padding: "0 0 6px", marginBottom: 4,
+                    borderBottom: "1px solid #F1F1F1",
+                  }}>
+                    {["","Task","Due date","Status","Priority","Assigned","",""].map((h, i) => (
+                      <div key={i} style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 600,
+                        textTransform: "uppercase", letterSpacing: 0.4 }}>{h}</div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Task rows */}
+                {stageTasks.map(task => (
+                  <InlineTaskRow
+                    key={task.id}
+                    task={task}
+                    isExpanded={expandedTask === task.id}
+                    onToggleExpand={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
+                    onChange={changes => updateTask(key, task.id, changes)}
+                    onToggleComplete={() => updateTask(key, task.id, {
+                      completed: !task.completed,
+                      status: !task.completed ? "Completed" : "Not Started",
+                    })}
+                    onRemove={() => removeTask(key, task.id)}
+                  />
+                ))}
+
+                {/* Add task row */}
+                {adding === key ? (
+                  <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+                    <div style={{ width: 20 }} />
+                    <input
+                      autoFocus
+                      style={{ ...styles.input, flex: 1, fontSize: 13 }}
+                      placeholder="Task title — press Enter to add"
+                      value={addTitle}
+                      onChange={e => setAddTitle(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") addTask(key);
+                        if (e.key === "Escape") { setAdding(null); setAddTitle(""); }
+                      }}
+                    />
+                    <button style={{ ...styles.btn(), padding: "7px 14px", fontSize: 12 }}
+                      onClick={() => addTask(key)}>Add</button>
+                    <button style={{ ...styles.btn("ghost"), padding: "7px 10px" }}
+                      onClick={() => { setAdding(null); setAddTitle(""); }}>✕</button>
+                  </div>
+                ) : (
+                  <button
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6, marginTop: 10,
+                      background: "none", border: `1px dashed #E5E7EB`, borderRadius: 8,
+                      padding: "7px 14px", cursor: "pointer", color: "#9CA3AF",
+                      fontSize: 12, fontWeight: 500, width: "100%", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND; e.currentTarget.style.color = BRAND; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#E5E7EB"; e.currentTarget.style.color = "#9CA3AF"; }}
+                    onClick={() => { setAdding(key); setAddTitle(""); }}
+                  >
+                    + Add subtask
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Inline Task Row ──────────────────────────────────────────────────────────
+function InlineTaskRow({ task, isExpanded, onToggleExpand, onChange, onToggleComplete, onRemove }) {
+  const isOverdue = task.dueDate && daysUntil(task.dueDate) < 0 && !task.completed;
+
+  const cellBase = {
+    fontSize: 12, color: "#374151", background: "none", border: "none",
+    outline: "none", width: "100%", fontFamily: "inherit",
+  };
+
+  const selectStyle = {
+    ...cellBase,
+    cursor: "pointer", borderRadius: 6, padding: "3px 4px",
+    border: "1px solid transparent",
+  };
+
+  return (
+    <div style={{ borderBottom: "1px solid #F9FAFB" }}>
+      {/* Main row */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "20px 1fr 110px 120px 90px 120px 60px 28px",
+        gap: 8, alignItems: "center", padding: "7px 0",
+        opacity: task.completed ? 0.55 : 1,
+        transition: "opacity 0.15s",
+      }}>
+
+        {/* Checkbox */}
+        <input type="checkbox" checked={task.completed} onChange={onToggleComplete}
+          style={{ width: 15, height: 15, accentColor: BRAND, cursor: "pointer", margin: 0 }} />
+
+        {/* Title — inline editable */}
+        <input
+          style={{
+            ...cellBase, fontSize: 13, fontWeight: 500,
+            textDecoration: task.completed ? "line-through" : "none",
+            color: task.completed ? "#9CA3AF" : "#111",
+            padding: "3px 6px", borderRadius: 6,
+            border: "1px solid transparent",
+          }}
+          value={task.title}
+          placeholder="Task name…"
+          onChange={e => onChange({ title: e.target.value })}
+          onFocus={e => { e.target.style.border = `1px solid ${BRAND}40`; e.target.style.background = "#FAFAFA"; }}
+          onBlur={e => { e.target.style.border = "1px solid transparent"; e.target.style.background = "none"; }}
+        />
+
+        {/* Due date */}
+        <input
+          type="date"
+          style={{
+            ...cellBase, cursor: "pointer",
+            color: isOverdue ? "#EF4444" : task.dueDate ? "#374151" : "#C4C4C4",
+            fontSize: 11, padding: "3px 4px", borderRadius: 6,
+            border: "1px solid transparent",
+          }}
+          value={task.dueDate}
+          onChange={e => onChange({ dueDate: e.target.value })}
+          onFocus={e => e.target.style.border = `1px solid ${BRAND}40`}
+          onBlur={e => e.target.style.border = "1px solid transparent"}
+        />
+
+        {/* Status */}
+        <select
+          style={{
+            ...selectStyle,
+            color: taskStatusColors[task.status] || "#6B7280",
+            fontWeight: 600, fontSize: 11,
+          }}
+          value={task.status}
+          onChange={e => onChange({ status: e.target.value,
+            completed: e.target.value === "Completed",
+          })}
+          onFocus={e => e.target.style.border = `1px solid ${BRAND}40`}
+          onBlur={e => e.target.style.border = "1px solid transparent"}
+        >
+          {TASK_STATUSES.map(s => <option key={s}>{s}</option>)}
+        </select>
+
+        {/* Priority */}
+        <select
+          style={{ ...selectStyle, color: priorityColors[task.priority] || "#6B7280", fontWeight: 600, fontSize: 11 }}
+          value={task.priority}
+          onChange={e => onChange({ priority: e.target.value })}
+          onFocus={e => e.target.style.border = `1px solid ${BRAND}40`}
+          onBlur={e => e.target.style.border = "1px solid transparent"}
+        >
+          {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+        </select>
+
+        {/* Assigned */}
+        <select
+          style={{ ...selectStyle, fontSize: 11, color: task.assignedTo ? "#374151" : "#C4C4C4" }}
+          value={task.assignedTo}
+          onChange={e => onChange({ assignedTo: e.target.value })}
+          onFocus={e => e.target.style.border = `1px solid ${BRAND}40`}
+          onBlur={e => e.target.style.border = "1px solid transparent"}
+        >
+          <option value="">Unassigned</option>
+          {TEAM_MEMBERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+
+        {/* Expand details toggle */}
+        <button
+          onClick={onToggleExpand}
+          title="Notes / description"
+          style={{
+            background: isExpanded ? BRAND_LIGHT : "none", border: "none", cursor: "pointer",
+            color: isExpanded ? BRAND : "#C4C4C4", borderRadius: 5, padding: "3px 6px",
+            fontSize: 13, transition: "all 0.15s",
+          }}
+        >
+          ≡
+        </button>
+
+        {/* Remove */}
+        <button
+          onClick={onRemove}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            color: "#D1D5DB", fontSize: 16, padding: "2px 4px",
+            borderRadius: 4, transition: "color 0.15s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = "#EF4444"}
+          onMouseLeave={e => e.currentTarget.style.color = "#D1D5DB"}
+        >×</button>
+      </div>
+
+      {/* Expandable detail panel */}
+      {isExpanded && (
+        <div style={{
+          marginLeft: 28, marginBottom: 10, padding: "10px 12px",
+          background: "#FAFAFA", borderRadius: 8, border: "1px solid #F1F1F1",
+        }}>
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 11, color: "#9CA3AF", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Description</label>
+            <textarea
+              style={{
+                ...styles.input, height: 60, fontSize: 12, resize: "vertical",
+                background: "#fff",
+              }}
+              placeholder="Add a description or notes…"
+              value={task.description}
+              onChange={e => onChange({ description: e.target.value })}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "#9CA3AF", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Comments / call notes</label>
+            <textarea
+              style={{
+                ...styles.input, height: 50, fontSize: 12, resize: "vertical",
+                background: "#fff",
+              }}
+              placeholder="Log a comment or update…"
+              value={task.comments}
+              onChange={e => onChange({ comments: e.target.value })}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Files View ───────────────────────────────────────────────────────────────
+function FilesView({ proj, save }) {
+  const [newLabel, setNewLabel] = useState("");
+  const [newUrl, setNewUrl] = useState("");
+
+  const addLink = () => {
+    if (!newLabel.trim() || !newUrl.trim()) return;
+    save({ ...proj, links: [...(proj.links || []), { label: newLabel.trim(), url: newUrl.trim() }] });
+    setNewLabel(""); setNewUrl("");
+  };
+
+  const removeLink = (i) => save({ ...proj, links: proj.links.filter((_, idx) => idx !== i) });
+
+  const platform = url => {
+    if (url.includes("drive.google")) return { name: "Google Drive", color: "#4285F4" };
+    if (url.includes("dropbox")) return { name: "Dropbox", color: "#0061FF" };
+    if (url.includes("frame.io")) return { name: "Frame.io", color: "#292929" };
+    if (url.includes("vimeo")) return { name: "Vimeo", color: "#1AB7EA" };
+    return { name: "Link", color: "#6B7280" };
+  };
+
+  return (
+    <div style={styles.card}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px" }}>Files & Links</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginBottom: 20 }}>
+        {(proj.links || []).map((link, i) => {
+          const p = platform(link.url);
+          return (
+            <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 10, padding: 14, position: "relative" }}>
+              <div style={{ display: "flex", align: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ background: p.color + "22", color: p.color, fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>{p.name}</span>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 4 }}>{link.label}</div>
+              <a href={link.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: BRAND }}>Open →</a>
+              <button onClick={() => removeLink(i)}
+                style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", fontSize: 16 }}>×</button>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ borderTop: "1px solid #F1F1F1", paddingTop: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Add Link</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <input style={{ ...styles.input, flex: 1, minWidth: 180 }} placeholder="Label (e.g. Frame.io Preview)" value={newLabel} onChange={e => setNewLabel(e.target.value)} />
+          <input style={{ ...styles.input, flex: 2, minWidth: 220 }} placeholder="URL" value={newUrl} onChange={e => setNewUrl(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addLink()} />
+          <button style={styles.btn()} onClick={addLink}>Add</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Team View ────────────────────────────────────────────────────────────────
+function TeamView({ proj, save }) {
+  const assigned = TEAM_MEMBERS.filter(m => (proj.team || []).includes(m.id));
+  const available = TEAM_MEMBERS.filter(m => !(proj.team || []).includes(m.id));
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div style={styles.card}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px" }}>Assigned Team</h3>
+        {assigned.map(m => (
+          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #F9FAFB" }}>
+            <Avatar initials={m.avatar} size={36} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{m.name}</div>
+              <div style={{ fontSize: 11, color: "#6B7280" }}>{m.role}</div>
+            </div>
+            <button onClick={() => save({ ...proj, team: proj.team.filter(id => id !== m.id) })}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#EF4444", fontSize: 18 }}>×</button>
+          </div>
+        ))}
+        {assigned.length === 0 && <div style={{ color: "#9CA3AF", fontSize: 13 }}>No team members assigned.</div>}
+      </div>
+      <div style={styles.card}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px" }}>Add Team Member</h3>
+        {available.map(m => (
+          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #F9FAFB" }}>
+            <Avatar initials={m.avatar} size={36} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{m.name}</div>
+              <div style={{ fontSize: 11, color: "#6B7280" }}>{m.role}</div>
+            </div>
+            <button onClick={() => save({ ...proj, team: [...(proj.team || []), m.id] })}
+              style={styles.btn()}>+ Add</button>
+          </div>
+        ))}
+        {available.length === 0 && <div style={{ color: "#9CA3AF", fontSize: 13 }}>All team members assigned.</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Activity Log ─────────────────────────────────────────────────────────────
+function ActivityView({ proj, save }) {
+  const [note, setNote] = useState("");
+
+  const addNote = () => {
+    if (!note.trim()) return;
+    const entry = { date: new Date().toISOString().split("T")[0], note: note.trim() };
+    save({ ...proj, activityLog: [entry, ...(proj.activityLog || [])] });
+    setNote("");
+  };
+
+  return (
+    <div style={styles.card}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px" }}>Activity Log</h3>
+      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+        <input style={{ ...styles.input, flex: 1 }} placeholder="Log an update or note..." value={note} onChange={e => setNote(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && addNote()} />
+        <button style={styles.btn()} onClick={addNote}>Log</button>
+      </div>
+      <div>
+        {(proj.activityLog || []).map((entry, i) => (
+          <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", borderBottom: "1px solid #F9FAFB" }}>
+            <div style={{ fontSize: 11, color: "#9CA3AF", whiteSpace: "nowrap", paddingTop: 2 }}>{fmt(entry.date)}</div>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: BRAND, flexShrink: 0, marginTop: 5 }} />
+            <div style={{ fontSize: 13, color: "#374151" }}>{entry.note}</div>
+          </div>
+        ))}
+        {!(proj.activityLog || []).length && <div style={{ color: "#9CA3AF", fontSize: 13 }}>No activity logged yet.</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Deliverables ─────────────────────────────────────────────────────────────
+function DeliverablesView({ proj, save }) {
+  const [newD, setNewD] = useState("");
+  const [checked, setChecked] = useState({});
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div style={styles.card}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px" }}>Deliverables Checklist</h3>
+        {(proj.deliverables || []).map((d, i) => (
+          <label key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #F9FAFB", cursor: "pointer" }}>
+            <input type="checkbox" checked={!!checked[i]} onChange={e => setChecked(c => ({ ...c, [i]: e.target.checked }))} style={{ accentColor: BRAND }} />
+            <span style={{ fontSize: 13, color: checked[i] ? "#9CA3AF" : "#111", textDecoration: checked[i] ? "line-through" : "none" }}>{d}</span>
+          </label>
+        ))}
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <input style={{ ...styles.input, flex: 1, fontSize: 12 }} value={newD} placeholder="Add deliverable..." onChange={e => setNewD(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && newD.trim()) { save({ ...proj, deliverables: [...(proj.deliverables || []), newD.trim()] }); setNewD(""); } }} />
+          <button style={{ ...styles.btn(), padding: "6px 10px" }}
+            onClick={() => { if (newD.trim()) { save({ ...proj, deliverables: [...(proj.deliverables || []), newD.trim()] }); setNewD(""); } }}>+</button>
+        </div>
+      </div>
+      <div style={styles.card}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px" }}>Revision Tracker</h3>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, color: "#6B7280" }}>Revisions Used</div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: proj.revisionCount >= proj.revisionLimit ? "#EF4444" : BRAND }}>
+            {proj.revisionCount} <span style={{ fontSize: 16, color: "#9CA3AF" }}>/ {proj.revisionLimit}</span>
+          </div>
+          <ProgressBar pct={proj.revisionLimit ? (proj.revisionCount / proj.revisionLimit) * 100 : 0} color={proj.revisionCount >= proj.revisionLimit ? "#EF4444" : BRAND} />
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={styles.btn("secondary")} onClick={() => save({ ...proj, revisionCount: Math.max(0, proj.revisionCount - 1) })}>−</button>
+          <button style={styles.btn()} onClick={() => save({ ...proj, revisionCount: proj.revisionCount + 1 })}>+ Log Revision</button>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>Revision Limit</label>
+          <input type="number" min={1} max={10} style={{ ...styles.input, width: 80 }} value={proj.revisionLimit}
+            onChange={e => save({ ...proj, revisionLimit: Number(e.target.value) })} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Calendar View ────────────────────────────────────────────────────────────
+function CalendarView({ projects }) {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonth = () => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); };
+  const nextMonth = () => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); };
+
+  const eventsForDay = (day) => {
+    const d = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const events = [];
+    projects.forEach(p => {
+      if (p.shootDate === d) events.push({ label: p.name, type: "shoot", color: "#3B82F6" });
+      if (p.deliveryDeadline === d) events.push({ label: p.name, type: "deadline", color: daysUntil(d) < 0 ? "#EF4444" : "#E31B25" });
+    });
+    return events;
+  };
+
+  const monthName = new Date(year, month).toLocaleString("en-GB", { month: "long" });
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Calendar</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button style={styles.btn("secondary")} onClick={prevMonth}>←</button>
+          <span style={{ fontWeight: 700, fontSize: 16 }}>{monthName} {year}</span>
+          <button style={styles.btn("secondary")} onClick={nextMonth}>→</button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+        {[["#3B82F6","Shoot Day"],["#E31B25","Delivery Deadline"]].map(([c,l]) => (
+          <div key={l} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6B7280" }}>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: c }} />
+            {l}
+          </div>
+        ))}
+      </div>
+
+      <div style={styles.card}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, marginBottom: 8 }}>
+          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+            <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: "#9CA3AF", padding: "4px 0" }}>{d}</div>
+          ))}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+          {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
+          {Array.from({ length: daysInMonth }).map((_, i) => {
+            const day = i + 1;
+            const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+            const events = eventsForDay(day);
+            return (
+              <div key={day} style={{
+                minHeight: 72, padding: "6px", borderRadius: 8,
+                background: isToday ? BRAND_LIGHT : "#FAFAFA",
+                border: `1px solid ${isToday ? BRAND : "#F1F1F1"}`,
+              }}>
+                <div style={{ fontSize: 12, fontWeight: isToday ? 700 : 400, color: isToday ? BRAND : "#374151", marginBottom: 4 }}>{day}</div>
+                {events.map((ev, ei) => (
+                  <div key={ei} style={{
+                    fontSize: 10, padding: "2px 4px", borderRadius: 4,
+                    background: ev.color, color: "#fff", marginBottom: 2,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>{ev.label}</div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ ...styles.card, marginTop: 20 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 14px" }}>Upcoming Deadlines</h3>
+        {projects
+          .filter(p => p.deliveryDeadline && daysUntil(p.deliveryDeadline) !== null && daysUntil(p.deliveryDeadline) <= 30)
+          .sort((a, b) => new Date(a.deliveryDeadline) - new Date(b.deliveryDeadline))
+          .map(p => {
+            const d = daysUntil(p.deliveryDeadline);
+            return (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid #F9FAFB" }}>
+                <div style={{ width: 40, height: 40, borderRadius: 8, background: d < 0 ? "#FEF2F2" : d <= 3 ? "#FEF3C7" : BRAND_LIGHT, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: d < 0 ? "#EF4444" : d <= 3 ? "#F59E0B" : BRAND }}>{d < 0 ? "OD" : `${d}d`}</span>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: "#6B7280" }}>{p.client} · Due {fmt(p.deliveryDeadline)}</div>
+                </div>
+                <StatusBadge status={p.status} />
+              </div>
+            );
+          })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+function Analytics({ projects }) {
+  const statusCounts = {};
+  PROJECT_STATUSES.forEach(s => { statusCounts[s] = projects.filter(p => p.status === s).length; });
+  const totalTasks = projects.reduce((sum, p) => sum + STAGE_KEYS.flatMap(k => p.tasks[k]).length, 0);
+  const doneTasks = projects.reduce((sum, p) => sum + STAGE_KEYS.flatMap(k => p.tasks[k]).filter(t => t.completed).length, 0);
+
+  const maxStatus = Math.max(...Object.values(statusCounts), 1);
+
+  return (
+    <div>
+      <h1 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 20px" }}>Analytics</h1>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+        {[
+          { label: "Total Projects", value: projects.length, color: "#6366F1" },
+          { label: "Tasks Completed", value: `${doneTasks}/${totalTasks}`, color: "#10B981" },
+          { label: "Active Projects", value: projects.filter(p => !["Delivered","Archived"].includes(p.status)).length, color: BRAND },
+        ].map(s => (
+          <div key={s.label} style={{ ...styles.card, borderTop: `3px solid ${s.color}` }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+        <div style={styles.card}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 16px" }}>Projects by Status</h3>
+          {PROJECT_STATUSES.filter(s => statusCounts[s] > 0).map(s => (
+            <div key={s} style={{ marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                <StatusBadge status={s} />
+                <span style={{ color: "#6B7280" }}>{statusCounts[s]}</span>
+              </div>
+              <ProgressBar pct={(statusCounts[s] / maxStatus) * 100} color={statusColors[s] || "#6B7280"} />
+            </div>
+          ))}
+        </div>
+        <div style={styles.card}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 16px" }}>Task Completion by Stage</h3>
+          {STAGE_KEYS.map((k, i) => {
+            const all = projects.flatMap(p => p.tasks[k] || []);
+            const done = all.filter(t => t.completed).length;
+            const pct = all.length ? Math.round(done / all.length * 100) : 0;
+            return (
+              <div key={k} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: "#374151" }}>{STAGE_LABELS[i]}</span>
+                  <span style={{ color: "#6B7280" }}>{done}/{all.length} ({pct}%)</span>
+                </div>
+                <ProgressBar pct={pct} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={styles.card}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 16px" }}>Projects by Type</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+          {JOB_TYPES.map(t => {
+            const count = projects.filter(p => p.jobType === t).length;
+            if (!count) return null;
+            return (
+              <div key={t} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: "#374151" }}>{t}</span>
+                  <span style={{ color: "#6B7280" }}>{count}</span>
+                </div>
+                <ProgressBar pct={(count / projects.length) * 100} color="#6366F1" />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Supabase Config ─────────────────────────────────────────────────────────
+// Paste your Supabase Project URL and anon key here
+const SUPABASE_URL = "https://imnizeygtgmkseiuheeh.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imltbml6ZXlndGdta3NlaXVoZWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3ODc4NjMsImV4cCI6MjA5NTM2Mzg2M30.tdkTzZgfiGPYQTon0-eOsmoaEVZkREZGEDvkXensmGY";
+
+// Each project is stored as a row: { id, data: {...}, updated_at }
+async function dbLoad() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/projects?select=id,data`, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+  if (!res.ok) throw new Error("Load failed");
+  const rows = await res.json();
+  return rows.length ? rows.map(r => r.data) : null;
+}
+
+async function dbSaveProject(project) {
+  await fetch(`${SUPABASE_URL}/rest/v1/projects`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates",
+    },
+    body: JSON.stringify({ id: project.id, data: project, updated_at: new Date().toISOString() }),
+  });
+}
+
+async function dbDeleteProject(id) {
+  await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${id}`, {
+    method: "DELETE",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+}
+
+// ─── App Shell ────────────────────────────────────────────────────────────────
+const configured = SUPABASE_URL !== "YOUR_SUPABASE_URL";
+
+function App() {
+  const [view, setView] = useState("dashboard");
+  const [projects, setProjects] = useState(INITIAL_PROJECTS);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("idle"); // idle | loading | saving | error
+  const [prevProjects, setPrevProjects] = useState(null);
+
+  // On mount: load from Supabase (or fall back to localStorage)
+  useEffect(() => {
+    if (!configured) {
+      try {
+        const saved = localStorage.getItem("frameflow_local");
+        if (saved) setProjects(JSON.parse(saved));
+      } catch {}
+      return;
+    }
+    setSyncStatus("loading");
+    dbLoad()
+      .then(rows => {
+        if (rows) setProjects(rows);
+        setSyncStatus("idle");
+      })
+      .catch(() => {
+        // Fall back to localStorage if offline
+        try {
+          const saved = localStorage.getItem("frameflow_local");
+          if (saved) setProjects(JSON.parse(saved));
+        } catch {}
+        setSyncStatus("error");
+      });
+  }, []);
+
+  // Save to Supabase (and localStorage backup) whenever projects change
+  useEffect(() => {
+    if (prevProjects === null) { setPrevProjects(projects); return; }
+    if (prevProjects === projects) return;
+    setPrevProjects(projects);
+
+    // Always keep a local backup
+    try { localStorage.setItem("frameflow_local", JSON.stringify(projects)); } catch {}
+
+    if (!configured) return;
+
+    setSyncStatus("saving");
+
+    // Find added/changed projects vs previous
+    const changed = projects.filter(p => {
+      const old = prevProjects.find(o => o.id === p.id);
+      return !old || JSON.stringify(old) !== JSON.stringify(p);
+    });
+    // Find deleted projects
+    const deleted = prevProjects.filter(o => !projects.find(p => p.id === o.id));
+
+    Promise.all([
+      ...changed.map(p => dbSaveProject(p)),
+      ...deleted.map(p => dbDeleteProject(p.id)),
+    ])
+      .then(() => setSyncStatus("idle"))
+      .catch(() => setSyncStatus("error"));
+  }, [projects]);
+
+  // Sync selected project when projects update
+  useEffect(() => {
+    if (selectedProject) {
+      const updated = projects.find(p => p.id === selectedProject.id);
+      if (updated) setSelectedProject(updated);
+    }
+  }, [projects]);
+
+  const SyncIndicator = () => {
+    if (!configured) return (
+      <div style={{ padding: "6px 12px", background: "#FEF3C7", borderRadius: 8,
+        fontSize: 11, color: "#92400E", fontWeight: 600 }}>
+        ⚠ Local only — add Supabase keys to sync across devices
+      </div>
+    );
+    if (syncStatus === "loading") return (
+      <div style={{ padding: "6px 12px", background: "#EFF6FF", borderRadius: 8,
+        fontSize: 11, color: "#1D4ED8", fontWeight: 600 }}>◌ Loading…</div>
+    );
+    if (syncStatus === "saving") return (
+      <div style={{ padding: "6px 12px", background: "#F0FDF4", borderRadius: 8,
+        fontSize: 11, color: "#15803D", fontWeight: 600 }}>↑ Saving…</div>
+    );
+    if (syncStatus === "error") return (
+      <div style={{ padding: "6px 12px", background: "#FEF2F2", borderRadius: 8,
+        fontSize: 11, color: "#B91C1C", fontWeight: 600 }}>⚠ Sync error</div>
+    );
+    return (
+      <div style={{ padding: "6px 12px", background: "#F0FDF4", borderRadius: 8,
+        fontSize: 11, color: "#15803D", fontWeight: 600 }}>✓ Synced</div>
+    );
+  };
+
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", background: "#F7F7F8", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+      <Nav view={view} setView={v => { setView(v); setSelectedProject(null); }} projects={projects} />
+      <main style={{ flex: 1, padding: "2rem", overflowY: "auto", minHeight: "100vh" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+          <SyncIndicator />
+        </div>
+        {view === "dashboard" && (
+          <Dashboard projects={projects} setView={setView} setSelectedProject={setSelectedProject} />
+        )}
+        {view === "projects" && (
+          <ProjectsView projects={projects} setProjects={setProjects} setSelectedProject={setSelectedProject} setView={setView} />
+        )}
+        {view === "project_detail" && selectedProject && (
+          <ProjectDetail
+            project={selectedProject}
+            setProjects={setProjects}
+            onBack={() => setView("projects")}
+          />
+        )}
+        {view === "calendar" && <CalendarView projects={projects} />}
+        {view === "analytics" && <Analytics projects={projects} />}
+      </main>
+    </div>
+  );
+}
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>
